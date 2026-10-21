@@ -127,7 +127,9 @@ LIBPLDM_CC_ALWAYS_INLINE int pldm__msgbuf_extract_range_field_format(
 	return -PLDM_ERROR_INVALID_DATA;
 }
 
-/* This API is bad, but it's because the caller's APIs are also bad */
+/* This API is bad, but it's because the caller's APIs are also bad.
+ * Handles only sizes up to SINT32 — for use by stable APIs with uint8_t[4]
+ * output buffers. */
 LIBPLDM_CC_ALWAYS_INLINE int
 pldm_msgbuf_extract_effecter_value(struct pldm_msgbuf *ctx,
 				   enum pldm_effecter_data_size tag, void *dst)
@@ -145,14 +147,42 @@ pldm_msgbuf_extract_effecter_value(struct pldm_msgbuf *ctx,
 		return pldm__msgbuf_extract_uint32(ctx, dst);
 	case PLDM_EFFECTER_DATA_SIZE_SINT32:
 		return pldm__msgbuf_extract_int32(ctx, dst);
+	default:
+		return -PLDM_ERROR_INVALID_DATA;
 	}
+}
 
-	return -PLDM_ERROR_INVALID_DATA;
+/* Extended variant supporting uint64/sint64 — for use by testing APIs with
+ * union_effecter_data_size output buffers. */
+LIBPLDM_CC_ALWAYS_INLINE int
+pldm_msgbuf_extract_effecter_value64(struct pldm_msgbuf *ctx,
+				     enum pldm_effecter_data_size tag, void *dst)
+{
+	switch (tag) {
+	case PLDM_EFFECTER_DATA_SIZE_UINT8:
+		return pldm__msgbuf_extract_uint8(ctx, dst);
+	case PLDM_EFFECTER_DATA_SIZE_SINT8:
+		return pldm__msgbuf_extract_int8(ctx, dst);
+	case PLDM_EFFECTER_DATA_SIZE_UINT16:
+		return pldm__msgbuf_extract_uint16(ctx, dst);
+	case PLDM_EFFECTER_DATA_SIZE_SINT16:
+		return pldm__msgbuf_extract_int16(ctx, dst);
+	case PLDM_EFFECTER_DATA_SIZE_UINT32:
+		return pldm__msgbuf_extract_uint32(ctx, dst);
+	case PLDM_EFFECTER_DATA_SIZE_SINT32:
+		return pldm__msgbuf_extract_int32(ctx, dst);
+	case PLDM_EFFECTER_DATA_SIZE_UINT64:
+		return pldm__msgbuf_extract_uint64(ctx, dst);
+	case PLDM_EFFECTER_DATA_SIZE_SINT64:
+		return pldm__msgbuf_extract_int64(ctx, dst);
+	default:
+		return -PLDM_ERROR_INVALID_DATA;
+	}
 }
 
 #define pldm_msgbuf_extract_effecter_data(ctx, tag, dst)                       \
 	pldm_msgbuf_extract_typecheck(union_effecter_data_size,                \
-				      pldm__msgbuf_extract_range_field_format, \
+				      pldm__msgbuf_extract_effecter_data,      \
 				      dst, ctx, tag, (void *)&(dst))
 LIBPLDM_CC_ALWAYS_INLINE int
 pldm__msgbuf_extract_effecter_data(struct pldm_msgbuf *ctx,
@@ -183,9 +213,17 @@ pldm__msgbuf_extract_effecter_data(struct pldm_msgbuf *ctx,
 		return pldm__msgbuf_extract_int32(
 			ctx, ((char *)ed) + offsetof(union_effecter_data_size,
 						     value_s32));
+	case PLDM_EFFECTER_DATA_SIZE_UINT64:
+		return pldm__msgbuf_extract_uint64(
+			ctx, ((char *)ed) + offsetof(union_effecter_data_size,
+						     value_u64));
+	case PLDM_EFFECTER_DATA_SIZE_SINT64:
+		return pldm__msgbuf_extract_int64(
+			ctx, ((char *)ed) + offsetof(union_effecter_data_size,
+						     value_s64));
+	default:
+		return -PLDM_ERROR_INVALID_DATA;
 	}
-
-	return -PLDM_ERROR_INVALID_DATA;
 }
 
 #ifdef __cplusplus

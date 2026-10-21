@@ -150,14 +150,24 @@ enum pldm_platform_transfer_flag {
  */
 #define PLDM_PLATFORM_ENTITY_SYSTEM_CONTAINER_ID 0
 
+/** @brief PLDM effecter data size types. Support for UINT64 and SINT64 was
+ *         added in DSP0248 v1.3.0.
+ */
 enum pldm_effecter_data_size {
 	PLDM_EFFECTER_DATA_SIZE_UINT8,
 	PLDM_EFFECTER_DATA_SIZE_SINT8,
 	PLDM_EFFECTER_DATA_SIZE_UINT16,
 	PLDM_EFFECTER_DATA_SIZE_SINT16,
 	PLDM_EFFECTER_DATA_SIZE_UINT32,
-	PLDM_EFFECTER_DATA_SIZE_SINT32
+	PLDM_EFFECTER_DATA_SIZE_SINT32,
+	PLDM_EFFECTER_DATA_SIZE_UINT64,
+	PLDM_EFFECTER_DATA_SIZE_SINT64
 };
+
+/** @brief Maximum byte length of a numeric effecter value.
+ *  Corresponds to the size of the largest supported data type (uint64/sint64).
+ */
+#define PLDM_EFFECTER_DATA_SIZE_MAX_BYTES_LENGTH 8
 
 enum pldm_range_field_format {
 	PLDM_RANGE_FIELD_FORMAT_UINT8,
@@ -725,6 +735,8 @@ typedef union {
 	int16_t value_s16;
 	uint32_t value_u32;
 	int32_t value_s32;
+	uint64_t value_u64;
+	int64_t value_s64;
 } union_effecter_data_size;
 
 /** @union union_range_field_format
@@ -1330,6 +1342,24 @@ int decode_set_numeric_effecter_value_req(const struct pldm_msg *msg,
 					  uint8_t *effecter_data_size,
 					  uint8_t effecter_value[4]);
 
+/** @brief Decode SetNumericEffecterValue request data, supporting uint64 and
+	*         sint64 (DSP0248 v1.3.0).
+	*
+	*  @param[in] msg - Request message
+	*  @param[in] payload_length - Length of request message payload
+	*  @param[out] effecter_id - used to identify and access the effecter
+	*  @param[out] effecter_data_size - The bit width and format of the setting
+	*              value. value:{uint8,sint8,uint16,sint16,uint32,sint32,
+	*              uint64,sint64}
+	*  @param[out] effecter_value - The setting value. Access the appropriate
+	*              union member based on effecter_data_size.
+	*  @return pldm_completion_codes
+	*/
+int pldm_platform_set_numeric_effecter_value_req_decode(
+	const struct pldm_msg *msg, size_t payload_length,
+	uint16_t *effecter_id, uint8_t *effecter_data_size,
+	union_effecter_data_size *effecter_value);
+
 /** @brief Create a PLDM response message for SetNumericEffecterValue
  *
  *  @param[in] instance_id - Message's instance id
@@ -1513,6 +1543,27 @@ int encode_get_numeric_effecter_value_resp(
 	uint8_t effecter_data_size, uint8_t effecter_oper_state,
 	const uint8_t *pending_value, const uint8_t *present_value,
 	struct pldm_msg *msg, size_t payload_length);
+
+/** @brief Decode GetNumericEffecterValue response data, supporting uint64 and
+	*         sint64 (DSP0248 v1.3.0).
+	*
+	*  @param[in] msg - Request message
+	*  @param[in] payload_length - Length of response message payload
+	*  @param[out] completion_code - PLDM completion code
+	*  @param[out] effecter_data_size - value:{uint8,sint8,uint16,sint16,uint32,
+	*              sint32,uint64,sint64}
+	*  @param[out] effecter_oper_state - The state of the effecter itself
+	*  @param[out] pending_value - The pending numeric value. Access the
+	*              appropriate union member based on effecter_data_size.
+	*  @param[out] present_value - The present numeric value. Access the
+	*              appropriate union member based on effecter_data_size.
+	*  @return pldm_completion_codes
+	*/
+int pldm_platform_get_numeric_effecter_value_resp_decode(
+	const struct pldm_msg *msg, size_t payload_length,
+	uint8_t *completion_code, uint8_t *effecter_data_size,
+	uint8_t *effecter_oper_state, union_effecter_data_size *pending_value,
+	union_effecter_data_size *present_value);
 
 /* GetSensorReading */
 
@@ -1767,10 +1818,28 @@ int decode_set_state_effecter_states_resp(const struct pldm_msg *msg,
  */
 int encode_set_numeric_effecter_value_req(uint8_t instance_id,
 					  uint16_t effecter_id,
-					  uint8_t effecter_data_size,
-					  const uint8_t *effecter_value,
-					  struct pldm_msg *msg,
-					  size_t payload_length);
+				  uint8_t effecter_data_size,
+				  const uint8_t *effecter_value,
+				  struct pldm_msg *msg,
+				  size_t payload_length);
+
+/** @brief Create a PLDM request message for SetNumericEffecterValue,
+	*         supporting uint64 and sint64 (DSP0248 v1.3.0).
+	*
+	*  @param[in] instance_id - Message's instance id
+	*  @param[in] effecter_id - used to identify and access the effecter
+	*  @param[in] effecter_data_size - value:{uint8,sint8,uint16,sint16,uint32,
+	*             sint32,uint64,sint64}
+	*  @param[in] effecter_value - The setting value. Set the appropriate union
+	*             member based on effecter_data_size.
+	*  @param[in] payload_length - Length of request message payload
+	*  @param[out] msg - Message will be written to this
+	*  @return pldm_completion_codes
+	*/
+int pldm_platform_set_numeric_effecter_value_req_encode(
+	uint8_t instance_id, uint16_t effecter_id, uint8_t effecter_data_size,
+	const union_effecter_data_size *effecter_value, struct pldm_msg *msg,
+	size_t payload_length);
 
 /** @brief Decode SetNumericEffecterValue response data
  *  @param[in] msg - Request message
@@ -2213,7 +2282,30 @@ int decode_get_numeric_effecter_value_resp(const struct pldm_msg *msg,
 					   uint8_t *effecter_data_size,
 					   uint8_t *effecter_oper_state,
 					   uint8_t *pending_value,
-					   uint8_t *present_value);
+				   uint8_t *present_value);
+
+/** @brief Create a PLDM response message for GetNumericEffecterValue,
+	*         supporting uint64 and sint64 (DSP0248 v1.3.0).
+	*
+	*  @param[in] instance_id - Message's instance id
+	*  @param[in] completion_code - PLDM completion code
+	*  @param[in] effecter_data_size - value:{uint8,sint8,uint16,sint16,uint32,
+	*             sint32,uint64,sint64}
+	*  @param[in] effecter_oper_state - The state of the effecter itself
+	*  @param[in] pending_value - The pending numeric value. Set the appropriate
+	*             union member based on effecter_data_size.
+	*  @param[in] present_value - The present numeric value. Set the appropriate
+	*             union member based on effecter_data_size.
+	*  @param[out] msg - Message will be written to this
+	*  @param[in] payload_length - Length of response message payload
+	*  @return pldm_completion_codes
+	*/
+int pldm_platform_get_numeric_effecter_value_resp_encode(
+	uint8_t instance_id, uint8_t completion_code,
+	uint8_t effecter_data_size, uint8_t effecter_oper_state,
+	const union_effecter_data_size *pending_value,
+	const union_effecter_data_size *present_value, struct pldm_msg *msg,
+	size_t payload_length);
 
 /** @brief Decode pldmPDRRepositoryChgEvent response data
  *

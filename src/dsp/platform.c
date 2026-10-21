@@ -2105,6 +2105,270 @@ int decode_get_numeric_effecter_value_resp(const struct pldm_msg *msg,
 	return PLDM_SUCCESS;
 }
 
+
+LIBPLDM_ABI_TESTING
+int pldm_platform_set_numeric_effecter_value_req_encode(
+	uint8_t instance_id, uint16_t effecter_id, uint8_t effecter_data_size,
+	const union_effecter_data_size *effecter_value, struct pldm_msg *msg,
+	size_t payload_length)
+{
+	if (msg == NULL || effecter_value == NULL) {
+		return PLDM_ERROR_INVALID_DATA;
+	}
+
+	if (effecter_data_size > PLDM_EFFECTER_DATA_SIZE_SINT64) {
+		return PLDM_ERROR_INVALID_DATA;
+	}
+
+	struct pldm_header_info header = { 0 };
+	header.msg_type = PLDM_REQUEST;
+	header.instance = instance_id;
+	header.pldm_type = PLDM_PLATFORM;
+	header.command = PLDM_SET_NUMERIC_EFFECTER_VALUE;
+
+	uint8_t rc = pack_pldm_header(&header, &(msg->hdr));
+	if (rc != PLDM_SUCCESS) {
+		return rc;
+	}
+
+	struct pldm_set_numeric_effecter_value_req *request =
+		(struct pldm_set_numeric_effecter_value_req *)msg->payload;
+
+	if (effecter_data_size == PLDM_EFFECTER_DATA_SIZE_UINT8 ||
+	    effecter_data_size == PLDM_EFFECTER_DATA_SIZE_SINT8) {
+		if (payload_length !=
+		    PLDM_SET_NUMERIC_EFFECTER_VALUE_MIN_REQ_BYTES) {
+			return PLDM_ERROR_INVALID_LENGTH;
+		}
+		request->effecter_value[0] = effecter_value->value_u8;
+	} else if (effecter_data_size == PLDM_EFFECTER_DATA_SIZE_UINT16 ||
+		   effecter_data_size == PLDM_EFFECTER_DATA_SIZE_SINT16) {
+		if (payload_length !=
+		    PLDM_SET_NUMERIC_EFFECTER_VALUE_MIN_REQ_BYTES + 1) {
+			return PLDM_ERROR_INVALID_LENGTH;
+		}
+		uint16_t val = htole16(effecter_value->value_u16);
+		memcpy(request->effecter_value, &val, sizeof(val));
+	} else if (effecter_data_size == PLDM_EFFECTER_DATA_SIZE_UINT32 ||
+		   effecter_data_size == PLDM_EFFECTER_DATA_SIZE_SINT32) {
+		if (payload_length !=
+		    PLDM_SET_NUMERIC_EFFECTER_VALUE_MIN_REQ_BYTES + 3) {
+			return PLDM_ERROR_INVALID_LENGTH;
+		}
+		uint32_t val = htole32(effecter_value->value_u32);
+		memcpy(request->effecter_value, &val, sizeof(val));
+	} else if (effecter_data_size == PLDM_EFFECTER_DATA_SIZE_UINT64 ||
+		   effecter_data_size == PLDM_EFFECTER_DATA_SIZE_SINT64) {
+		if (payload_length !=
+		    PLDM_SET_NUMERIC_EFFECTER_VALUE_MIN_REQ_BYTES +
+			    sizeof(uint64_t) - 1) {
+			return PLDM_ERROR_INVALID_LENGTH;
+		}
+		uint64_t val = htole64(effecter_value->value_u64);
+		memcpy(request->effecter_value, &val, sizeof(val));
+	}
+
+	request->effecter_id = htole16(effecter_id);
+	request->effecter_data_size = effecter_data_size;
+
+	return PLDM_SUCCESS;
+}
+
+LIBPLDM_ABI_TESTING
+int pldm_platform_set_numeric_effecter_value_req_decode(
+	const struct pldm_msg *msg, size_t payload_length,
+	uint16_t *effecter_id, uint8_t *effecter_data_size,
+	union_effecter_data_size *effecter_value)
+{
+	struct pldm_msgbuf _buf;
+	struct pldm_msgbuf *buf = &_buf;
+	int rc;
+
+	if (msg == NULL || effecter_id == NULL || effecter_data_size == NULL ||
+	    effecter_value == NULL) {
+		return PLDM_ERROR_INVALID_DATA;
+	}
+
+	rc = pldm_msgbuf_init_errno(
+		buf, PLDM_SET_NUMERIC_EFFECTER_VALUE_MIN_REQ_BYTES,
+		msg->payload, payload_length);
+	if (rc) {
+		return pldm_xlate_errno(rc);
+	}
+
+	pldm_msgbuf_extract_p(buf, effecter_id);
+	rc = pldm_msgbuf_extract_p(buf, effecter_data_size);
+	if (rc) {
+		return PLDM_ERROR_INVALID_DATA;
+	}
+
+	if (*effecter_data_size > PLDM_EFFECTER_DATA_SIZE_SINT64) {
+		return PLDM_ERROR_INVALID_DATA;
+	}
+
+	pldm_msgbuf_extract_effecter_value64(buf, *effecter_data_size,
+					     (void *)effecter_value);
+
+	rc = pldm_msgbuf_complete(buf);
+	if (rc) {
+		return pldm_xlate_errno(rc);
+	}
+
+	return PLDM_SUCCESS;
+}
+
+LIBPLDM_ABI_TESTING
+int pldm_platform_get_numeric_effecter_value_resp_encode(
+	uint8_t instance_id, uint8_t completion_code,
+	uint8_t effecter_data_size, uint8_t effecter_oper_state,
+	const union_effecter_data_size *pending_value,
+	const union_effecter_data_size *present_value, struct pldm_msg *msg,
+	size_t payload_length)
+{
+	if (msg == NULL || pending_value == NULL || present_value == NULL) {
+		return PLDM_ERROR_INVALID_DATA;
+	}
+
+	if (effecter_data_size > PLDM_EFFECTER_DATA_SIZE_SINT64) {
+		return PLDM_ERROR_INVALID_DATA;
+	}
+
+	if (effecter_oper_state > EFFECTER_OPER_STATE_INTEST) {
+		return PLDM_ERROR_INVALID_DATA;
+	}
+
+	struct pldm_header_info header = { 0 };
+	header.msg_type = PLDM_RESPONSE;
+	header.instance = instance_id;
+	header.pldm_type = PLDM_PLATFORM;
+	header.command = PLDM_GET_NUMERIC_EFFECTER_VALUE;
+
+	uint8_t rc = pack_pldm_header(&header, &(msg->hdr));
+	if (rc != PLDM_SUCCESS) {
+		return rc;
+	}
+
+	struct pldm_get_numeric_effecter_value_resp *response =
+		(struct pldm_get_numeric_effecter_value_resp *)msg->payload;
+
+	response->completion_code = completion_code;
+	response->effecter_data_size = effecter_data_size;
+	response->effecter_oper_state = effecter_oper_state;
+
+	if (effecter_data_size == PLDM_EFFECTER_DATA_SIZE_UINT8 ||
+	    effecter_data_size == PLDM_EFFECTER_DATA_SIZE_SINT8) {
+		if (payload_length !=
+		    PLDM_GET_NUMERIC_EFFECTER_VALUE_MIN_RESP_BYTES) {
+			return PLDM_ERROR_INVALID_LENGTH;
+		}
+		response->pending_and_present_values[0] =
+			pending_value->value_u8;
+		response->pending_and_present_values[1] =
+			present_value->value_u8;
+	} else if (effecter_data_size == PLDM_EFFECTER_DATA_SIZE_UINT16 ||
+		   effecter_data_size == PLDM_EFFECTER_DATA_SIZE_SINT16) {
+		if (payload_length !=
+		    PLDM_GET_NUMERIC_EFFECTER_VALUE_MIN_RESP_BYTES + 2) {
+			return PLDM_ERROR_INVALID_LENGTH;
+		}
+		uint16_t pv = htole16(pending_value->value_u16);
+		memcpy(response->pending_and_present_values, &pv, sizeof(pv));
+		uint16_t rv = htole16(present_value->value_u16);
+		memcpy(response->pending_and_present_values + sizeof(pv),
+		       &rv, sizeof(rv));
+	} else if (effecter_data_size == PLDM_EFFECTER_DATA_SIZE_UINT32 ||
+		   effecter_data_size == PLDM_EFFECTER_DATA_SIZE_SINT32) {
+		if (payload_length !=
+		    PLDM_GET_NUMERIC_EFFECTER_VALUE_MIN_RESP_BYTES + 6) {
+			return PLDM_ERROR_INVALID_LENGTH;
+		}
+		uint32_t pv = htole32(pending_value->value_u32);
+		memcpy(response->pending_and_present_values, &pv, sizeof(pv));
+		uint32_t rv = htole32(present_value->value_u32);
+		memcpy(response->pending_and_present_values + sizeof(pv),
+		       &rv, sizeof(rv));
+	} else if (effecter_data_size == PLDM_EFFECTER_DATA_SIZE_UINT64 ||
+		   effecter_data_size == PLDM_EFFECTER_DATA_SIZE_SINT64) {
+		if (payload_length !=
+		    PLDM_GET_NUMERIC_EFFECTER_VALUE_MIN_RESP_BYTES +
+			    2 * sizeof(uint64_t) - 2) {
+			return PLDM_ERROR_INVALID_LENGTH;
+		}
+		uint64_t pv = htole64(pending_value->value_u64);
+		memcpy(response->pending_and_present_values, &pv, sizeof(pv));
+		uint64_t rv = htole64(present_value->value_u64);
+		memcpy(response->pending_and_present_values + sizeof(pv),
+		       &rv, sizeof(rv));
+	}
+
+	return PLDM_SUCCESS;
+}
+
+LIBPLDM_ABI_TESTING
+int pldm_platform_get_numeric_effecter_value_resp_decode(
+	const struct pldm_msg *msg, size_t payload_length,
+	uint8_t *completion_code, uint8_t *effecter_data_size,
+	uint8_t *effecter_oper_state, union_effecter_data_size *pending_value,
+	union_effecter_data_size *present_value)
+{
+	struct pldm_msgbuf _buf;
+	struct pldm_msgbuf *buf = &_buf;
+	int rc;
+
+	if (msg == NULL || effecter_data_size == NULL ||
+	    effecter_oper_state == NULL || pending_value == NULL ||
+	    present_value == NULL) {
+		return PLDM_ERROR_INVALID_DATA;
+	}
+
+	rc = pldm_msgbuf_init_errno(
+		buf, PLDM_GET_NUMERIC_EFFECTER_VALUE_MIN_RESP_BYTES,
+		msg->payload, payload_length);
+	if (rc) {
+		return pldm_xlate_errno(rc);
+	}
+
+	rc = pldm_msgbuf_extract_p(buf, completion_code);
+	if (rc) {
+		return PLDM_ERROR_INVALID_DATA;
+	}
+
+	if (PLDM_SUCCESS != *completion_code) {
+		return PLDM_SUCCESS;
+	}
+
+	rc = pldm_msgbuf_extract_p(buf, effecter_data_size);
+	if (rc) {
+		return PLDM_ERROR_INVALID_DATA;
+	}
+
+	if (*effecter_data_size > PLDM_EFFECTER_DATA_SIZE_SINT64) {
+		return PLDM_ERROR_INVALID_DATA;
+	}
+
+	rc = pldm_msgbuf_extract_p(buf, effecter_oper_state);
+	if (rc) {
+		return PLDM_ERROR_INVALID_DATA;
+	}
+
+	if (*effecter_oper_state > EFFECTER_OPER_STATE_INTEST) {
+		return PLDM_ERROR_INVALID_DATA;
+	}
+
+	pldm_msgbuf_extract_effecter_value64(buf, *effecter_data_size,
+					     (void *)pending_value);
+	pldm_msgbuf_extract_effecter_value64(buf, *effecter_data_size,
+					     (void *)present_value);
+
+	rc = pldm_msgbuf_complete_consumed(buf);
+	if (rc) {
+		return pldm_xlate_errno(rc);
+	}
+
+	return PLDM_SUCCESS;
+}
+
+
 LIBPLDM_ABI_STABLE
 int encode_pldm_pdr_repository_chg_event_data(
 	uint8_t event_data_format, uint8_t number_of_change_records,
